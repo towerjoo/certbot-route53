@@ -42,22 +42,36 @@ else
     exit 1
   fi
 
+  TMPFILE=$(mktemp /tmp/temporary-file.XXXXXXXX)
+    cat > ${TMPFILE} << EOF
+    {
+      "Changes":[
+        {
+          "Action":"${ACTION}",
+          "ResourceRecordSet":{
+            "ResourceRecords":[
+              {
+                "Value": "\"$CERTBOT_VALIDATION\""
+              }
+            ],
+            "Name":"_acme-challenge.${CERTBOT_DOMAIN}.",
+            "Type":"TXT",
+            "TTL":30
+          }
+        }
+      ]
+    }
+EOF
+
   aws route53 wait resource-record-sets-changed --id "$(
     aws route53 change-resource-record-sets \
     --hosted-zone-id "${HOSTED_ZONE_ID}" \
     --query ChangeInfo.Id --output text \
-    --change-batch "{
-      \"Changes\": [{
-        \"Action\": \"${ACTION}\",
-        \"ResourceRecordSet\": {
-          \"Name\": \"_acme-challenge.${CERTBOT_DOMAIN}.\",
-          \"ResourceRecords\": [{\"Value\": \"\\\"${CERTBOT_VALIDATION}\\\"\"}],
-          \"Type\": \"TXT\",
-          \"TTL\": 30
-        }
-      }]
-    }"
+    --change-batch file://"${TMPFILE}"
   )"
+
+  # Clean up
+  rm $TMPFILE
 
   echo 1
 fi
